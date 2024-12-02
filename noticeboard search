@@ -1,0 +1,113 @@
+// ==UserScript==
+// @name         noticeboard search
+// @namespace    http://tampermonkey.net/
+// @version      2024-01-23
+// @description  try to take over the world!
+// @author       You
+// @match        https://*.forumias.com/*/wp/v2/media/*
+// @match        https://forumias.com/blog/wp-json/wp/v2/posts*
+// @match        https://forumias.com/blog/wp-json/wp/v2/media*
+// @match        https://forumias.com/blog/wp-json/wp/v2/search*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=forumias.com
+// @grant        none
+// ==/UserScript==
+
+(function() {
+    'use strict';
+    function load_all_pages() {
+        var dataArray = [];
+        var url = window.location;
+        function load_page(page_number) {
+            fetch(url + `&page=` + page_number).then(response => {
+                if (response.ok) {
+                    response.json().then(j => {
+                        dataArray = [...dataArray, ...j];
+                        load_page(page_number + 1);
+                    });
+                } else {
+                    createTable(dataArray);
+                }
+            });
+        }
+        load_page(1);
+    }
+function createTable(dataArray) {
+    document.body.innerHTML=`<style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border: 1px solid #dddddd;
+            text-align: left;
+            padding: 8px;
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>`
+            var btn = document.createElement("button");
+            btn.innerHTML = `Load all pages`;
+            btn.addEventListener('click', load_all_pages);
+            var table = document.createElement("table");
+            var headerRow = table.insertRow(0);
+            var content = document.createElement("div");
+
+            // Selected fields: id, title, source_url, date
+            var fields = ["id", "caption", "title", "source_url", "date"];
+
+            // Create table headers
+            fields.forEach(function (field) {
+                var th = document.createElement("th");
+                th.textContent = field;
+                headerRow.appendChild(th);
+            });
+
+            // Create table rows and cells
+            for (var i = 0; i < dataArray.length; i++) {
+                var row = table.insertRow(i + 1);
+                fields.forEach(function (field) {
+                    var cell = row.insertCell();
+                    var data = dataArray[i];
+                    if (field === "title") {
+                        // Display title as a text content
+                        cell.innerHTML = data.title.rendered || data.title;
+                    } else if (field === "source_url") {
+                        // Make source_url a clickable link
+                        var link = document.createElement("a");
+                        var v = data.source_url || data.link || data.url;
+//                        if (dataArray[i].source_url) {
+                            link.href = v;
+                            link.textContent = v;
+//                        } else {
+//                            link.href = data.link;
+//                            link.textContent = data.link;
+//                        }
+                        cell.appendChild(link);
+                    } else if (field == "caption") {
+                        if (data.caption) {
+                            cell.innerHTML = data.caption.rendered;
+                        }
+                    } else if (field == "id") {
+                        cell.textContent = data.id;
+                        if (data.content) {
+                            const cr = data.content.rendered;
+                            cell.addEventListener('click', () => content.innerHTML = cr);
+                        }
+                    } else {
+                        cell.textContent = dataArray[i][field];
+                    }
+                });
+            }
+            document.body.appendChild(btn);
+            document.body.appendChild(table);
+            document.body.appendChild(content);
+
+        }
+
+
+    fetch(window.location).then(r => r.json()).then(j => createTable(j))
+    // Your code here...
+})();
